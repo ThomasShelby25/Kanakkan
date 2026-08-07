@@ -1,0 +1,8 @@
+# Ignore auto-generated files from GitHub language statistics
+web/** linguist-generated=true
+ios/** linguist-generated=true
+android/** linguist-generated=true
+macos/** linguist-generated=true
+windows/** linguist-generated=true
+linux/** linguist-generated=true
+*.json linguist-generated=true
