@@ -60,6 +60,12 @@ class FinanceProvider extends ChangeNotifier {
         .fold(0.0, (sum, item) => sum + item.amount);
   }
 
+  double getCategoryExpense(String category) {
+    return validTransactions
+        .where((tx) => tx.type == TransactionType.expense && tx.category.toLowerCase() == category.toLowerCase())
+        .fold(0.0, (sum, item) => sum + item.amount);
+  }
+
   List<WalletModel> _wallets = [];
   List<WalletModel> get wallets => _wallets;
 
@@ -145,6 +151,28 @@ class FinanceProvider extends ChangeNotifier {
 
     // Persist real transaction to Supabase backend asynchronously
     SupabaseService.createTransaction(transaction);
+  }
+
+  Future<void> updateTransaction(TransactionModel transaction) async {
+    final index = _transactions.indexWhere((tx) => tx.id == transaction.id);
+    if (index >= 0) {
+      _transactions[index] = transaction;
+      notifyListeners();
+    }
+    await SupabaseService.updateTransaction(transaction);
+    _netBalance = await SupabaseService.getNetBalance();
+    notifyListeners();
+  }
+
+  Future<void> deleteTransaction(String id) async {
+    final index = _transactions.indexWhere((tx) => tx.id == id);
+    if (index >= 0) {
+      _transactions.removeAt(index);
+      notifyListeners();
+    }
+    await SupabaseService.deleteTransaction(id);
+    _netBalance = await SupabaseService.getNetBalance();
+    notifyListeners();
   }
 
   Future<void> setBudget(String category, double amount) async {

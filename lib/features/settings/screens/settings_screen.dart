@@ -29,197 +29,166 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final avatarUrl = SupabaseService.currentUser?.userMetadata?['avatar_url'];
+    final displayName = SupabaseService.currentUser?.userMetadata?['display_name']
+        ?? SupabaseService.currentUser?.email?.split('@')[0]
+        ?? 'User';
+    final email = SupabaseService.currentUser?.email ?? '';
+    final phone = SupabaseService.currentUser?.userMetadata?['phone_number']?.toString() ?? '';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Settings',
-                style: AppTypography.headlineMedium(),
-              ),
-              const SizedBox(height: 16),
-
-              // Profile Card
-              Material(
-                color: AppColors.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppColors.outline),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () async {
-                    final updated = await Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
-                    if (updated == true) {
-                      setState(() {});
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                            image: SupabaseService.currentUser?.userMetadata?['avatar_url'] != null
-                                ? DecorationImage(
-                                    image: NetworkImage(SupabaseService.currentUser!.userMetadata!['avatar_url']),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: SupabaseService.currentUser?.userMetadata?['avatar_url'] == null
-                              ? Icon(Icons.person_rounded, color: AppColors.primary, size: 28)
+              // ── PROFILE BLOCK ────────────────────────────────────────────
+              // Not a card. Just a raw header block with generous vertical space.
+              InkWell(
+                onTap: () async {
+                  final updated = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                  );
+                  if (updated == true) setState(() {});
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                  child: Row(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainer,
+                          shape: BoxShape.circle,
+                          image: avatarUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(avatarUrl),
+                                  fit: BoxFit.cover,
+                                )
                               : null,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                SupabaseService.currentUser?.userMetadata?['display_name'] 
-                                    ?? SupabaseService.currentUser?.email?.split('@')[0] 
-                                    ?? 'User',
-                                style: AppTypography.titleMedium(),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                SupabaseService.currentUser?.email ?? 'Not logged in',
-                                style: AppTypography.labelSmall(color: AppColors.secondary),
-                              ),
-                              if (SupabaseService.currentUser?.userMetadata?['phone_number'] != null && 
-                                  SupabaseService.currentUser?.userMetadata?['phone_number'].toString().isNotEmpty == true)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    SupabaseService.currentUser!.userMetadata!['phone_number'],
-                                    style: AppTypography.labelSmall(color: AppColors.secondary),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        child: avatarUrl == null
+                            ? Icon(Icons.person_rounded, color: AppColors.secondary, size: 28)
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(displayName, style: AppTypography.headlineSmall()),
+                            if (email.isNotEmpty)
+                              Text(email, style: AppTypography.labelSmall(color: AppColors.secondary)),
+                            if (phone.isNotEmpty)
+                              Text(phone, style: AppTypography.labelSmall(color: AppColors.secondary)),
+                          ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'EDIT',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                      Icon(Icons.chevron_right, color: AppColors.secondary, size: 20),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Preferences Section
-              Text(
-                'PREFERENCES',
-                style: AppTypography.labelCaps(color: AppColors.secondary),
+              // Structural separator — means something: end of identity block
+              Divider(height: 1, color: AppColors.outline, indent: 20, endIndent: 20),
+
+              // ── PREFERENCES GROUP ────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Text('Preferences', style: AppTypography.labelCaps(color: AppColors.secondary)),
               ),
+              _buildSettingRow(
+                label: 'Dark Theme',
+                meta: 'Switch to dark ledger view',
+                trailing: Switch(
+                  value: _darkMode,
+                  activeThumbColor: AppColors.primary,
+                  onChanged: (val) {
+                    setState(() => _darkMode = val);
+                    Provider.of<FinanceProvider>(context, listen: false).toggleTheme(val);
+                  },
+                ),
+              ),
+
               const SizedBox(height: 8),
-              Material(
-                color: AppColors.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppColors.outline),
-                ),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: Text('Dark Theme', style: AppTypography.bodyMedium()),
-                      subtitle: Text('Enable dark mode UI',
-                          style: AppTypography.labelSmall(color: AppColors.secondary)),
-                      secondary: Icon(Icons.dark_mode_outlined, color: AppColors.onSurface),
-                      value: _darkMode,
-                      activeThumbColor: AppColors.primary,
-                      onChanged: (val) {
-                        setState(() => _darkMode = val);
-                        Provider.of<FinanceProvider>(context, listen: false).toggleTheme(val);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+              Divider(height: 1, color: AppColors.outline, indent: 20, endIndent: 20),
 
-              // Features
-              Text(
-                'FEATURES',
-                style: AppTypography.labelCaps(color: AppColors.secondary),
+              // ── DATA GROUP ────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Text('Data', style: AppTypography.labelCaps(color: AppColors.secondary)),
               ),
-              const SizedBox(height: 8),
-              Material(
-                color: AppColors.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppColors.outline),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      title: Text('Budgets & Goals', style: AppTypography.bodyMedium()),
-                      subtitle: Text('Set limits for category spending',
-                          style: AppTypography.labelSmall(color: AppColors.secondary)),
-                      leading: Icon(Icons.track_changes, color: AppColors.onSurface),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetScreen()));
-                      },
-                    ),
-                    Divider(color: AppColors.outline, height: 1),
-                    ListTile(
-                      title: Text('Manage Wallets', style: AppTypography.bodyMedium()),
-                      subtitle: Text('Add, edit, or delete accounts',
-                          style: AppTypography.labelSmall(color: AppColors.secondary)),
-                      leading: Icon(Icons.account_balance_wallet, color: AppColors.onSurface),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletManagerScreen()));
-                      },
-                    ),
-                  ],
-                ),
+              _buildSettingRow(
+                label: 'Budgets & Limits',
+                meta: 'Monthly spend limits by category',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetScreen())),
               ),
-              const SizedBox(height: 24),
+              _buildSettingRow(
+                label: 'Accounts',
+                meta: 'Add, rename, or remove wallets',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletManagerScreen())),
+              ),
 
-              // Logout Button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: const BorderSide(color: AppColors.error),
-                  ),
-                  onPressed: widget.onLogout,
-                  icon: const Icon(Icons.logout_rounded, size: 20),
-                  label: Text(
-                    'Log Out',
-                    style: AppTypography.titleMedium(color: AppColors.error),
+              const SizedBox(height: 32),
+              Divider(height: 1, color: AppColors.outline, indent: 20, endIndent: 20),
+
+              // ── SIGN OUT ─────────────────────────────────────────────────
+              // Not a button — just a tappable row. Low visual weight intentionally.
+              InkWell(
+                onTap: widget.onLogout,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Sign out',
+                        style: AppTypography.bodyMedium(color: AppColors.error)
+                            .copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
                 ),
               ),
+
               const SizedBox(height: 80),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // A flat ledger-style row with no icon circle
+  Widget _buildSettingRow({
+    required String label,
+    required String meta,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppTypography.bodyMedium().copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(meta, style: AppTypography.labelSmall(color: AppColors.secondary)),
+                ],
+              ),
+            ),
+            trailing ??
+                Icon(Icons.chevron_right, color: AppColors.secondary, size: 18),
+          ],
         ),
       ),
     );

@@ -95,6 +95,10 @@ class SupabaseService {
     await client.auth.signOut();
   }
 
+  static Future<void> resetPassword(String email) async {
+    await client.auth.resetPasswordForEmail(email);
+  }
+
   // Native Google Sign-In → exchanges ID token with Supabase
   static Future<AuthResponse?> signInWithGoogle() async {
     try {
@@ -293,6 +297,29 @@ static Future<void> createTransaction(TransactionModel tx) async {
       });
     } catch (e) {
       debugPrint('Supabase insert transaction error: $e');
+    }
+  }
+
+  static Future<void> updateTransaction(TransactionModel tx) async {
+    try {
+      await client.from('transactions').update({
+        'note': tx.title,
+        'amount': tx.amount,
+        'category': tx.category,
+        'type': tx.type == TransactionType.expense ? 'expense' : 'income',
+        'created_at': tx.date.toIso8601String(),
+      }).eq('id', tx.id);
+    } catch (e) {
+      debugPrint('Supabase update transaction error: $e');
+    }
+  }
+
+  static Future<void> deleteTransaction(String id) async {
+    try {
+      // Supabase ids are usually UUIDs, but here we used timestamp strings or UUIDs.
+      await client.from('transactions').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Supabase delete transaction error: $e');
     }
   }
 }

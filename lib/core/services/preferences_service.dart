@@ -20,4 +20,11 @@ class PreferencesService {
   static Future<void> setPushNotificationsEnabled(bool value) async {
     await _prefs.setBool(_keyPushNotifications, value);
   }
+
+  // --- Walkthrough ---
+  static const String _keyHasSeenWalkthrough = 'has_seen_walkthrough';
+  static bool get hasSeenWalkthrough => _prefs.getBool(_keyHasSeenWalkthrough) ?? false;
+  static Future<void> setHasSeenWalkthrough() async {
+    await _prefs.setBool(_keyHasSeenWalkthrough, true);
+  }
 }

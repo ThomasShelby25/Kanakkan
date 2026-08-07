@@ -7,7 +7,9 @@ import '../../../core/models/transaction.dart';
 import '../../../core/models/wallet.dart';
 
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({super.key});
+  final TransactionModel? existingTransaction;
+  
+  const AddTransactionScreen({super.key, this.existingTransaction});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -32,20 +34,69 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     {'name': 'Entertainment', 'icon': Icons.theater_comedy, 'label': 'ENT.'},
   ];
 
+  DateTime _selectedDate = DateTime.now();
+
   @override
   void initState() {
     super.initState();
-    // Initialize default wallets after frame
+    if (widget.existingTransaction != null) {
+      final tx = widget.existingTransaction!;
+      _selectedType = tx.type;
+      _amount = tx.amount.toStringAsFixed(2);
+      _selectedCategory = tx.category;
+      _selectedPayment = tx.walletName;
+      _selectedDate = tx.date;
+      if (tx.category == 'Transfer') {
+        _selectedType = TransactionType.transfer;
+        // Basic fallback for transfer edit, though complex to perfectly reverse
+        _fromWallet = tx.walletName;
+      }
+    }
+
+    // Initialize default wallets after frame if not editing or if fields are empty
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final wallets = Provider.of<FinanceProvider>(context, listen: false).wallets;
       if (wallets.isNotEmpty) {
         setState(() {
-          _selectedPayment = wallets.first.name;
-          _fromWallet = wallets.first.name;
-          _toWallet = wallets.length > 1 ? wallets[1].name : wallets.first.name;
+          _selectedPayment ??= wallets.first.name;
+          _fromWallet ??= wallets.first.name;
+          _toWallet ??= wallets.length > 1 ? wallets[1].name : wallets.first.name;
         });
       }
     });
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              onSurface: AppColors.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        // Keep the current time, just change the date
+        _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedDate.hour,
+          _selectedDate.minute,
+        );
+      });
+    }
   }
 
   void _appendDigit(String digit) {
@@ -76,17 +127,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (parsedAmount <= 0) return;
 
     final financeProvider = Provider.of<FinanceProvider>(context, listen: false);
-    final now = DateTime.now();
+    final isEditing = widget.existingTransaction != null;
 
     if (_selectedType == TransactionType.transfer) {
       if (_fromWallet == null || _toWallet == null || _fromWallet == _toWallet) return;
       
+      // If editing a transfer, it gets complicated because it's 2 transactions.
+      // For now, if it's a transfer, we just create new ones or edit one side.
       // 1. Expense from FromWallet
       final txOut = TransactionModel(
-        id: now.millisecondsSinceEpoch.toString(),
+        id: isEditing ? widget.existingTransaction!.id : DateTime.now().millisecondsSinceEpoch.toString(),
         title: 'Transfer to $_toWallet',
         amount: parsedAmount,
-        date: now,
+        date: _selectedDate,
         category: 'Transfer',
         icon: Icons.swap_horiz,
         type: TransactionType.expense,
@@ -94,30 +147,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         status: 'Paid',
       );
       
-      // 2. Income to ToWallet
-      final txIn = TransactionModel(
-        id: (now.millisecondsSinceEpoch + 1).toString(),
-        title: 'Transfer from $_fromWallet',
-        amount: parsedAmount,
-        date: now.add(const Duration(seconds: 1)),
-        category: 'Transfer',
-        icon: Icons.swap_horiz,
-        type: TransactionType.income,
-        walletName: _toWallet!,
-        status: 'Recv',
-      );
-
-      financeProvider.addTransaction(txOut);
-      financeProvider.addTransaction(txIn);
+      if (!isEditing) {
+        // 2. Income to ToWallet
+        final txIn = TransactionModel(
+          id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+          title: 'Transfer from $_fromWallet',
+          amount: parsedAmount,
+          date: _selectedDate.add(const Duration(seconds: 1)),
+          category: 'Transfer',
+          icon: Icons.swap_horiz,
+          type: TransactionType.income,
+          walletName: _toWallet!,
+          status: 'Recv',
+        );
+        financeProvider.addTransaction(txOut);
+        financeProvider.addTransaction(txIn);
+      } else {
+        financeProvider.updateTransaction(txOut);
+      }
 
     } else {
       if (_selectedPayment == null) return;
       // Normal transaction
       final newTx = TransactionModel(
-        id: now.millisecondsSinceEpoch.toString(),
+        id: isEditing ? widget.existingTransaction!.id : DateTime.now().millisecondsSinceEpoch.toString(),
         title: '$_selectedCategory Payment',
         amount: parsedAmount,
-        date: now,
+        date: _selectedDate,
         category: _selectedCategory,
         icon: _categories.firstWhere((c) => c['name'] == _selectedCategory, orElse: () => _categories[0])['icon'] as IconData,
         type: _selectedType,
@@ -125,7 +181,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         status: _selectedType == TransactionType.expense ? 'Paid' : 'Recv',
       );
 
-      financeProvider.addTransaction(newTx);
+      if (isEditing) {
+        financeProvider.updateTransaction(newTx);
+      } else {
+        financeProvider.addTransaction(newTx);
+      }
     }
 
     if (mounted) Navigator.pop(context);
@@ -143,7 +203,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Add Transaction', style: AppTypography.titleMedium()),
+        title: Text(widget.existingTransaction != null ? 'Edit Transaction' : 'Add Transaction', style: AppTypography.titleMedium()),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -171,7 +231,32 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 const SizedBox(height: 24),
 
                 // Large Amount Display
-                Text('AMOUNT', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('AMOUNT', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                    GestureDetector(
+                      onTap: () => _pickDate(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.secondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
+                              style: AppTypography.labelSmall(color: AppColors.onSurface).copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

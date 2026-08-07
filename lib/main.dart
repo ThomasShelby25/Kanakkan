@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/finance_provider.dart';
 import 'core/widgets/app_shell.dart';
-import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 
 import 'core/services/supabase_service.dart';
@@ -32,26 +32,22 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => FinanceProvider()..initTheme(),
-      child: const FinanceFlowApp(),
+      child: const KanakkanApp(),
     ),
   );
 }
 
-
-class FinanceFlowApp extends StatefulWidget {
-  const FinanceFlowApp({super.key});
+class KanakkanApp extends StatefulWidget {
+  const KanakkanApp({super.key});
 
   @override
-  State<FinanceFlowApp> createState() => _FinanceFlowAppState();
+  State<KanakkanApp> createState() => _KanakkanAppState();
 }
 
-class _FinanceFlowAppState extends State<FinanceFlowApp> {
-  late bool _isLoggedIn;
-
+class _KanakkanAppState extends State<KanakkanApp> {
   @override
   void initState() {
     super.initState();
-    _isLoggedIn = SupabaseService.client.auth.currentSession != null;
   }
 
   @override
@@ -59,19 +55,10 @@ class _FinanceFlowAppState extends State<FinanceFlowApp> {
     final isDark = context.watch<FinanceProvider>().isDarkTheme;
 
     return MaterialApp(
-      title: 'FinanceFlow',
+      title: 'KANAKKAN',
       debugShowCheckedModeBanner: false,
       theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
-      home: _isLoggedIn
-          ? AuthWrapper(
-              onLogout: () async {
-                await SupabaseService.signOut();
-                setState(() => _isLoggedIn = false);
-              },
-            )
-          : LoginScreen(
-              onLoginSuccess: () => setState(() => _isLoggedIn = true),
-            ),
+      home: const SplashScreen(),
     );
   }
 }

@@ -15,15 +15,22 @@ class WalletManagerScreen extends StatefulWidget {
 class _WalletManagerScreenState extends State<WalletManagerScreen> {
   void _showWalletDialog(BuildContext context, {WalletModel? existingWallet}) {
     final isEditing = existingWallet != null;
-    final nameCtrl = TextEditingController(text: isEditing ? existingWallet.name : '');
-    final balanceCtrl = TextEditingController(text: isEditing ? existingWallet.openingBalance.toStringAsFixed(2) : '');
+    final nameCtrl = TextEditingController(
+      text: isEditing ? existingWallet.name : '',
+    );
+    final balanceCtrl = TextEditingController(
+      text: isEditing ? existingWallet.openingBalance.toStringAsFixed(2) : '',
+    );
 
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          title: Text(isEditing ? 'Edit Wallet' : 'New Wallet', style: AppTypography.titleMedium()),
+          title: Text(
+            isEditing ? 'Edit Wallet' : 'New Wallet',
+            style: AppTypography.titleMedium(),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -50,7 +57,10 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: AppColors.secondary)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.secondary),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -62,8 +72,11 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
                 final balance = double.tryParse(balanceCtrl.text) ?? 0.0;
                 if (name.isEmpty) return;
 
-                final provider = Provider.of<FinanceProvider>(context, listen: false);
-                
+                final provider = Provider.of<FinanceProvider>(
+                  context,
+                  listen: false,
+                );
+
                 if (isEditing) {
                   final updated = WalletModel(
                     id: existingWallet.id,
@@ -85,7 +98,7 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
                   );
                   await provider.createWallet(newWallet);
                 }
-                
+
                 if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Save'),
@@ -101,7 +114,10 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Delete Wallet?', style: AppTypography.titleMedium(color: AppColors.error)),
+        title: Text(
+          'Delete Wallet?',
+          style: AppTypography.titleMedium(color: AppColors.error),
+        ),
         content: Text(
           'Are you sure you want to delete "${wallet.name}"? This action cannot be undone.',
           style: AppTypography.bodyMedium(),
@@ -112,9 +128,15 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
             child: Text('Cancel', style: TextStyle(color: AppColors.secondary)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
-              final provider = Provider.of<FinanceProvider>(context, listen: false);
+              final provider = Provider.of<FinanceProvider>(
+                context,
+                listen: false,
+              );
               await provider.deleteWallet(wallet.id);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -157,21 +179,40 @@ class _WalletManagerScreenState extends State<WalletManagerScreen> {
               border: Border.all(color: AppColors.outline),
             ),
             child: ListTile(
-              leading: Icon(w.icon, color: w.isDark ? Colors.white : AppColors.onSurface),
-              title: Text(w.name, style: AppTypography.titleMedium(color: w.isDark ? Colors.white : AppColors.onSurface)),
+              leading: Icon(
+                w.icon,
+                color: w.isDark ? Colors.white : AppColors.onSurface,
+              ),
+              title: Text(
+                w.name,
+                style: AppTypography.titleMedium(
+                  color: w.isDark ? Colors.white : AppColors.onSurface,
+                ),
+              ),
               subtitle: Text(
                 'Opening: ₹${w.openingBalance.toStringAsFixed(2)}',
-                style: AppTypography.labelSmall(color: w.isDark ? Colors.white70 : AppColors.secondary),
+                style: AppTypography.labelSmall(
+                  color: w.isDark ? Colors.white70 : AppColors.secondary,
+                ),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: Icon(Icons.edit_rounded, color: w.isDark ? Colors.white70 : AppColors.secondary, size: 20),
-                    onPressed: () => _showWalletDialog(context, existingWallet: w),
+                    icon: Icon(
+                      Icons.edit_rounded,
+                      color: w.isDark ? Colors.white70 : AppColors.secondary,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        _showWalletDialog(context, existingWallet: w),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
                     onPressed: () => _confirmDelete(context, w),
                   ),
                 ],

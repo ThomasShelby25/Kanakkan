@@ -7,6 +7,7 @@ import '../../../core/providers/finance_provider.dart';
 import '../../../core/models/transaction.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/report_service.dart';
+import 'add_transaction_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -157,7 +158,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Transactions Feed List
+              // Transactions Feed — flat ledger list, no card container
               Expanded(
                 child: filteredTransactions.isEmpty
                     ? Center(
@@ -166,19 +167,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           style: AppTypography.bodyMedium(color: AppColors.secondary),
                         ),
                       )
-                    : Material(
-                        color: AppColors.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: AppColors.outline),
-                        ),
-                        child: ListView.separated(
-                          controller: _scrollController,
-                          itemCount: filteredTransactions.length + (_isLoadingMore ? 1 : 0),
-                          separatorBuilder: (context, index) =>
-                              Divider(height: 1, color: AppColors.outline),
-                          itemBuilder: (context, index) {
-                            if (index == filteredTransactions.length) {
+                    : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: filteredTransactions.length + (_isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == filteredTransactions.length) {
                               return const Padding(
                                 padding: EdgeInsets.all(16.0),
                                 child: Center(child: CircularProgressIndicator()),
@@ -186,76 +179,150 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                             }
                             final tx = filteredTransactions[index];
                             final isExpense = tx.type == TransactionType.expense;
-                            return ListTile(
-                              leading: Container(
-                                width: 40,
-                                height: 40,
+                            return GestureDetector(
+                              onTap: () => _showTransactionOptions(context, tx),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                                 decoration: BoxDecoration(
-                                  color: AppColors.surfaceContainer,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  tx.icon,
-                                  color: AppColors.onSurface,
-                                  size: 20,
-                                ),
-                              ),
-                              title: Text(
-                                tx.title,
-                                style: AppTypography.bodyMedium().copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${DateFormat('MMM dd, yyyy').format(tx.date)} • ${tx.walletName}',
-                                style: AppTypography.labelSmall(color: AppColors.secondary),
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${isExpense ? '-' : '+'}₹${tx.amount.toStringAsFixed(2)}',
-                                    style: AppTypography.amountSmall(
-                                      color: isExpense
-                                          ? AppColors.onSurface
-                                          : AppColors.primary,
-                                    ),
+                                  color: Colors.transparent, // Ensure taps register
+                                  border: Border(
+                                    bottom: BorderSide(color: AppColors.outline, width: 1),
                                   ),
-
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isExpense
-                                          ? AppColors.onSurface.withValues(alpha: 0.05)
-                                          : AppColors.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      tx.status.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        color: isExpense
-                                            ? AppColors.onSurface
-                                            : AppColors.primary,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceContainerLow,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        tx.category.isNotEmpty ? tx.category[0].toUpperCase() : '?',
+                                        style: AppTypography.labelCaps(color: AppColors.secondary)
+                                            .copyWith(fontSize: 11, fontWeight: FontWeight.w800),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            tx.title,
+                                            style: AppTypography.bodyMedium().copyWith(fontWeight: FontWeight.w600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            '${DateFormat('MMM d, yyyy').format(tx.date)} · ${tx.walletName}',
+                                            style: AppTypography.labelSmall(color: AppColors.secondary),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      '${isExpense ? '−' : '+'}₹${tx.amount.toStringAsFixed(2)}',
+                                      style: AppTypography.amountSmall(
+                                        color: isExpense ? AppColors.onSurface : AppColors.incomeGreen,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
                           },
                         ),
-                      ),
               ),
               const SizedBox(height: 80),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showTransactionOptions(BuildContext context, TransactionModel tx) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        tx.category.isNotEmpty ? tx.category[0].toUpperCase() : '?',
+                        style: AppTypography.titleMedium(),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(tx.title, style: AppTypography.titleMedium()),
+                          Text('₹${tx.amount.toStringAsFixed(2)}', style: AppTypography.amountSmall(color: AppColors.secondary, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(height: 1, color: AppColors.outline),
+              ListTile(
+                leading: Icon(Icons.edit_outlined, color: AppColors.onSurface),
+                title: Text('Edit Transaction', style: AppTypography.bodyMedium()),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AddTransactionScreen(existingTransaction: tx)),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                title: Text('Delete Transaction', style: AppTypography.bodyMedium().copyWith(color: AppColors.error)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await context.read<FinanceProvider>().deleteTransaction(tx.id);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 }

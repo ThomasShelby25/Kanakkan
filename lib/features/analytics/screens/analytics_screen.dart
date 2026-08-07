@@ -37,14 +37,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final totalExpense = categoryTotals.values.fold(0.0, (sum, val) => sum + val);
 
-    final List<Color> pieColors = [
-      AppColors.primary,
-      const Color(0xFFE57373),
-      const Color(0xFF64B5F6),
-      const Color(0xFFFFD54F),
-      const Color(0xFF81C784),
-      const Color(0xFFBA68C8),
+    // Category-semantic colors — each tied to the real-world meaning of the category
+    // NOT sequential rainbow cycling
+    const Map<String, Color> categoryColors = {
+      'Food':          Color(0xFFD97706), // Amber warmth — heat, kitchen, organic
+      'Shopping':      Color(0xFFB45309), // Dusty sienna — commerce, leather, retail
+      'Transport':     Color(0xFF2563EB), // Cool slate blue — roads, movement, sky
+      'Entertainment': Color(0xFF7C3AED), // Muted violet — screens, leisure, night
+      'General':       Color(0xFF4B5563), // Charcoal gray — neutral catch-all
+      'Transfer':      Color(0xFF059669), // Teal green — movement between accounts
+    };
+    // Fallback palette for categories not in the map
+    const List<Color> fallbackColors = [
+      Color(0xFF9D4E15),
+      Color(0xFF1D4ED8),
+      Color(0xFF6D28D9),
+      Color(0xFF065F46),
     ];
+
+    Color colorForCategory(String name, int index) {
+      return categoryColors[name] ?? fallbackColors[index % fallbackColors.length];
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -96,13 +109,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       centerSpaceRadius: 60,
                       sections: List.generate(sortedCategories.length, (i) {
                         final isTouched = i == _touchedIndex;
-                        final fontSize = isTouched ? 16.0 : 0.0; // Hide text when not touched for clean look
-                        final radius = isTouched ? 60.0 : 50.0;
+                        final fontSize = isTouched ? 14.0 : 0.0;
+                        final radius = isTouched ? 58.0 : 50.0;
                         final entry = sortedCategories[i];
                         final percentage = (entry.value / totalExpense) * 100;
-                        
+                        final sectionColor = colorForCategory(entry.key, i);
+
                         return PieChartSectionData(
-                          color: pieColors[i % pieColors.length],
+                          color: sectionColor,
                           value: entry.value,
                           title: '${percentage.toStringAsFixed(1)}%',
                           radius: radius,
@@ -135,15 +149,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: Column(
                     children: List.generate(sortedCategories.length, (i) {
                       final entry = sortedCategories[i];
+                      final dotColor = colorForCategory(entry.key, i);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
                         child: Row(
                           children: [
                             Container(
-                              width: 12,
-                              height: 12,
+                              width: 10,
+                              height: 10,
                               decoration: BoxDecoration(
-                                color: pieColors[i % pieColors.length],
+                                color: dotColor,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -155,7 +170,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             const Spacer(),
                             Text(
                               '₹${entry.value.toStringAsFixed(2)}',
-                              style: AppTypography.bodyMedium().copyWith(fontWeight: FontWeight.bold),
+                              style: AppTypography.amountSmall(
+                                color: AppColors.onSurface,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),

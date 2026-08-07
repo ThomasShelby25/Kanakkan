@@ -1,0 +1,36 @@
+<div style="display:flex;justify-content:center;padding:1rem 0">
+  <div style="width:280px;height:400px;border-radius:28px;background:#111110;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;border:0.5px solid var(--border)">
+    <div id="digit" style="font-family:var(--font-mono);font-weight:500;font-size:34px;color:#D32F2F">0</div>
+    <div id="word" style="margin-top:18px;font-family:var(--font-sans);font-weight:500;font-size:20px;letter-spacing:6px;color:#F5F4F2;opacity:0">KANAKKAN</div>
+    <div id="line" style="margin-top:10px;width:0;height:2px;background:#D32F2F"></div>
+  </div>
+</div>
+<div style="display:flex;justify-content:center;margin-top:1rem"><button id="replay" style="font-size:13px">Replay ↺</button></div>
+<script>
+function play(){
+  const digit=document.getElementById('digit');
+  const word=document.getElementById('word');
+  const line=document.getElementById('line');
+  word.style.transition='none'; word.style.opacity='0'; word.style.transform='translateY(4px)';
+  line.style.transition='none'; line.style.width='0';
+  const glyphs=['0','3','7','K'];
+  let i=0;
+  const roll=setInterval(()=>{
+    digit.textContent=glyphs[i%glyphs.length];
+    i++;
+    if(i>10){
+      clearInterval(roll);
+      digit.textContent='K';
+      digit.style.color='#F5F4F2';
+      word.style.transition='opacity 300ms ease-out, transform 300ms ease-out';
+      word.style.opacity='1'; word.style.transform='translateY(0)';
+      setTimeout(()=>{
+        line.style.transition='width 320ms ease-out';
+        line.style.width='120px';
+      },200);
+    }
+  },55);
+}
+document.getElementById('replay').addEventListener('click', play);
+play();
+</script>

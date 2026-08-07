@@ -31,7 +31,7 @@ class ReportService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'FinanceFlow_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      name: 'Kanakkan_Statement_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
   }
 
@@ -39,7 +39,7 @@ class ReportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('FINANCEFLOW', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+        pw.Text('KANAKKAN', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
         pw.SizedBox(height: 4),
         pw.Text('Official Account Statement', style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
         pw.SizedBox(height: 16),

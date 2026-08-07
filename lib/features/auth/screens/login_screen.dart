@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/supabase_service.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 
 
@@ -232,7 +233,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                      );
+                    },
                     child: Text(
                       'Forgot password?',
                       style: AppTypography.bodyMedium(color: AppColors.primary)

@@ -3,78 +3,80 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTypography {
-  // Display & Headers: Hanken Grotesk
-  static TextStyle displayLarge({Color? color}) =>
-      GoogleFonts.hankenGrotesk(
-        fontSize: 32,
-        fontWeight: FontWeight.bold,
+  // ── DISPLAY FACE: Space Grotesk ──────────────────────────────────────────
+  // Used for screen titles, section headings, and wallet names.
+  static TextStyle displayLarge({Color? color}) => GoogleFonts.spaceGrotesk(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
         color: color ?? AppColors.onSurface,
-        height: 1.2,
+        height: 1.1,
+        letterSpacing: -1.0,
       );
 
-  static TextStyle headlineMedium({Color? color}) =>
-      GoogleFonts.hankenGrotesk(
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
+  static TextStyle headlineMedium({Color? color}) => GoogleFonts.spaceGrotesk(
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
         color: color ?? AppColors.onSurface,
+        letterSpacing: -0.5,
       );
 
-  static TextStyle headlineSmall({Color? color}) =>
-      GoogleFonts.hankenGrotesk(
+  static TextStyle headlineSmall({Color? color}) => GoogleFonts.spaceGrotesk(
         fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: color ?? AppColors.onSurface,
+        letterSpacing: -0.3,
+      );
+
+  static TextStyle titleMedium({Color? color}) => GoogleFonts.spaceGrotesk(
+        fontSize: 16,
         fontWeight: FontWeight.w600,
         color: color ?? AppColors.onSurface,
       );
 
-  static TextStyle titleMedium({Color? color}) =>
-      GoogleFonts.hankenGrotesk(
+  // ── BODY FACE: Inter ─────────────────────────────────────────────────────
+  // Used for descriptions, labels, metadata, and utility copy.
+  static TextStyle bodyLarge({Color? color}) => GoogleFonts.inter(
         fontSize: 16,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w400,
         color: color ?? AppColors.onSurface,
+        height: 1.5,
       );
 
-  // Body & UI Labels: Inter
-  static TextStyle bodyLarge({Color? color}) =>
-      GoogleFonts.inter(
-        fontSize: 18,
-        fontWeight: FontWeight.normal,
-        color: color ?? AppColors.onSurface,
-      );
-
-  static TextStyle bodyMedium({Color? color}) =>
-      GoogleFonts.inter(
+  static TextStyle bodyMedium({Color? color}) => GoogleFonts.inter(
         fontSize: 14,
-        fontWeight: FontWeight.normal,
+        fontWeight: FontWeight.w400,
         color: color ?? AppColors.onSurface,
+        height: 1.5,
       );
 
-  static TextStyle labelCaps({Color? color}) =>
-      GoogleFonts.inter(
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 0.8,
+  static TextStyle labelCaps({Color? color}) => GoogleFonts.inter(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.2,
         color: color ?? AppColors.secondary,
       );
 
-  static TextStyle labelSmall({Color? color}) =>
-      GoogleFonts.inter(
+  static TextStyle labelSmall({Color? color}) => GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: color ?? AppColors.secondary,
+        height: 1.4,
       );
 
-  // Monetary Data & Amounts: JetBrains Mono
-  static TextStyle amountLarge({Color? color, double fontSize = 32}) =>
+  // ── MONETARY FACE: JetBrains Mono ────────────────────────────────────────
+  // Used exclusively for currency amounts — tabular figures, monospaced ledger feel.
+  static TextStyle amountLarge({Color? color, double fontSize = 36}) =>
       GoogleFonts.jetBrainsMono(
         fontSize: fontSize,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w700,
         color: color ?? AppColors.onSurface,
+        letterSpacing: -1.0,
       );
 
   static TextStyle amountMedium({Color? color, double fontSize = 20}) =>
       GoogleFonts.jetBrainsMono(
         fontSize: fontSize,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w700,
         color: color ?? AppColors.onSurface,
       );
 
@@ -85,5 +87,3 @@ class AppTypography {
         color: color ?? AppColors.onSurface,
       );
 }
-
-
