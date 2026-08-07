@@ -29,8 +29,10 @@ class FinanceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  double _netBalance = 0.0;
-  double get netBalance => _netBalance;
+  double get netBalance {
+    double base = _wallets.fold(0.0, (sum, w) => sum + w.openingBalance);
+    return base + totalIncome - totalExpense;
+  }
   
   DateTime? get _earliestBalanceSetAt {
     if (_wallets.isEmpty) return null;
@@ -90,7 +92,6 @@ class FinanceProvider extends ChangeNotifier {
           _wallets = fetchedWallets;
         }
         _budgets = await SupabaseService.getBudgets();
-        _netBalance = await SupabaseService.getNetBalance();
       }
 
       final limit = 50;
@@ -160,7 +161,6 @@ class FinanceProvider extends ChangeNotifier {
       notifyListeners();
     }
     await SupabaseService.updateTransaction(transaction);
-    _netBalance = await SupabaseService.getNetBalance();
     notifyListeners();
   }
 
@@ -171,7 +171,6 @@ class FinanceProvider extends ChangeNotifier {
       notifyListeners();
     }
     await SupabaseService.deleteTransaction(id);
-    _netBalance = await SupabaseService.getNetBalance();
     notifyListeners();
   }
 
@@ -195,8 +194,6 @@ class FinanceProvider extends ChangeNotifier {
     if (newWallet != null) {
       _wallets.add(newWallet);
       notifyListeners();
-      _netBalance = await SupabaseService.getNetBalance();
-      notifyListeners();
     }
   }
 
@@ -206,7 +203,6 @@ class FinanceProvider extends ChangeNotifier {
       _wallets[index] = wallet;
       notifyListeners();
       await SupabaseService.updateWallet(wallet);
-      _netBalance = await SupabaseService.getNetBalance();
       notifyListeners();
     }
   }
@@ -215,7 +211,6 @@ class FinanceProvider extends ChangeNotifier {
     _wallets.removeWhere((w) => w.id == id);
     notifyListeners();
     await SupabaseService.deleteWallet(id);
-    _netBalance = await SupabaseService.getNetBalance();
     notifyListeners();
   }
 
