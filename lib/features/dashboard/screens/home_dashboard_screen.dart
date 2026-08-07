@@ -30,9 +30,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _balanceAnimation = CurvedAnimation(
-      parent: _balanceController,
-      curve: Curves.easeOutCubic,
+    _balanceAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _balanceController,
+        curve: Curves.easeOutCubic,
+      ),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -157,8 +159,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
           AnimatedBuilder(
             animation: _balanceAnimation,
             builder: (context, _) {
-              final displayValue =
-                  _balanceAnimation.value * provider.netBalance;
+              final displayValue = _balanceAnimation.value;
               return Text(
                 '₹${displayValue.toStringAsFixed(2)}',
                 style: AppTypography.amountLarge(
