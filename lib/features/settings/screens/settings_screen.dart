@@ -5,6 +5,9 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/preferences_service.dart';
 import '../../../core/providers/finance_provider.dart';
+import '../../budgets/screens/budget_screen.dart';
+import '../../budgets/screens/wallet_manager_screen.dart';
+import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -41,45 +44,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
 
               // Profile Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
+              Material(
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.outline),
+                  side: BorderSide(color: AppColors.outline),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: AppColors.surface,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final updated = await Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                    if (updated == true) {
+                      setState(() {});
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        Text(
-                          SupabaseService.userName,
-                          style: AppTypography.titleMedium(),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                            image: SupabaseService.currentUser?.userMetadata?['avatar_url'] != null
+                                ? DecorationImage(
+                                    image: NetworkImage(SupabaseService.currentUser!.userMetadata!['avatar_url']),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: SupabaseService.currentUser?.userMetadata?['avatar_url'] == null
+                              ? Icon(Icons.person_rounded, color: AppColors.primary, size: 28)
+                              : null,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          SupabaseService.userEmail,
-                          style: AppTypography.labelSmall(color: AppColors.secondary),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                SupabaseService.currentUser?.userMetadata?['display_name'] 
+                                    ?? SupabaseService.currentUser?.email?.split('@')[0] 
+                                    ?? 'User',
+                                style: AppTypography.titleMedium(),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                SupabaseService.currentUser?.email ?? 'Not logged in',
+                                style: AppTypography.labelSmall(color: AppColors.secondary),
+                              ),
+                              if (SupabaseService.currentUser?.userMetadata?['phone_number'] != null && 
+                                  SupabaseService.currentUser?.userMetadata?['phone_number'].toString().isNotEmpty == true)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    SupabaseService.currentUser!.userMetadata!['phone_number'],
+                                    style: AppTypography.labelSmall(color: AppColors.secondary),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'EDIT',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -115,9 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Wallet Configuration
+              // Features
               Text(
-                'WALLET CONFIGURATION',
+                'FEATURES',
                 style: AppTypography.labelCaps(color: AppColors.secondary),
               ),
               const SizedBox(height: 8),
@@ -130,16 +172,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     ListTile(
-                      title: Text('Initial Balances', style: AppTypography.bodyMedium()),
-                      subtitle: Text('Set starting balance for your wallets',
+                      title: Text('Budgets & Goals', style: AppTypography.bodyMedium()),
+                      subtitle: Text('Set limits for category spending',
+                          style: AppTypography.labelSmall(color: AppColors.secondary)),
+                      leading: Icon(Icons.track_changes, color: AppColors.onSurface),
+                      trailing: const Icon(Icons.chevron_right, size: 20),
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetScreen()));
+                      },
+                    ),
+                    Divider(color: AppColors.outline, height: 1),
+                    ListTile(
+                      title: Text('Manage Wallets', style: AppTypography.bodyMedium()),
+                      subtitle: Text('Add, edit, or delete accounts',
                           style: AppTypography.labelSmall(color: AppColors.secondary)),
                       leading: Icon(Icons.account_balance_wallet, color: AppColors.onSurface),
                       trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: () => _showInitialBalanceDialog(context),
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletManagerScreen()));
+                      },
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
 
               // Logout Button
               SizedBox(
@@ -166,59 +222,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  void _showInitialBalanceDialog(BuildContext context) {
-    final mainCtrl = TextEditingController(text: PreferencesService.initialMainBalance.toStringAsFixed(2));
-    final savingsCtrl = TextEditingController(text: PreferencesService.initialSavingsBalance.toStringAsFixed(2));
-    final cashCtrl = TextEditingController(text: PreferencesService.initialCashBalance.toStringAsFixed(2));
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Initial Balances', style: AppTypography.titleMedium()),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: mainCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Main/Checking Balance (₹)'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: savingsCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Savings Balance (₹)'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: cashCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Cash Balance (₹)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final provider = Provider.of<FinanceProvider>(context, listen: false);
-                await provider.updateInitialBalance('Main', double.tryParse(mainCtrl.text) ?? 0.0);
-                await provider.updateInitialBalance('Savings', double.tryParse(savingsCtrl.text) ?? 0.0);
-                await provider.updateInitialBalance('Cash', double.tryParse(cashCtrl.text) ?? 0.0);
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

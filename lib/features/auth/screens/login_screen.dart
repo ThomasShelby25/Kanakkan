@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -25,36 +24,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _isLoading = false;
 
-  Future<void> _requestSmsPermission() async {
-    if (kIsWeb) return;
-    try {
-      final status = await Permission.sms.request();
-      if (mounted) {
-        if (status.isGranted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'SMS Permission Granted: Expense detection enabled for fixed wallet in ₹ (Rupees).',
-              ),
-              backgroundColor: AppColors.primary,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'SMS permission requested to monitor spent money from fixed wallet.',
-              ),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('SMS permission error: $e');
-    }
-  }
 
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
@@ -76,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await SupabaseService.signIn(email, password);
-      await _requestSmsPermission();
       if (mounted) {
         widget.onLoginSuccess();
       }
@@ -105,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await SupabaseService.signInWithGoogle();
       if (response != null && mounted) {
-        await _requestSmsPermission();
         widget.onLoginSuccess();
       }
     } catch (e) {

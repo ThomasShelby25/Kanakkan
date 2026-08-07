@@ -1,7 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/transaction.dart';
+import '../models/wallet.dart';
+import '../models/budget.dart';
+
+import 'dart:io';
 
 class SupabaseService {
   static const String supabaseUrl = 'https://vemaqpsqjmsqggrnntcz.supabase.co';
@@ -29,6 +34,43 @@ class SupabaseService {
 
   // Current User Helpers
   static User? get currentUser => client.auth.currentUser;
+
+  static Future<void> updateProfile({required String name, required String phone, String? avatarUrl}) async {
+    try {
+      final updates = {
+        'display_name': name,
+        'phone_number': phone,
+      };
+      if (avatarUrl != null) {
+        updates['avatar_url'] = avatarUrl;
+      }
+      
+      await client.auth.updateUser(
+        UserAttributes(data: updates),
+      );
+    } catch (e) {
+      debugPrint('Failed to update profile: $e');
+    }
+  }
+
+  static Future<String?> uploadAvatar(File imageFile) async {
+    try {
+      final user = currentUser;
+      if (user == null) return null;
+      
+      final fileExt = imageFile.path.split('.').last;
+      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      
+      await client.storage.from('avatars').upload(fileName, imageFile);
+      
+      final publicUrl = client.storage.from('avatars').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Avatar upload failed: $e');
+      return null;
+    }
+  }
+
   static String get userEmail => currentUser?.email ?? 'User';
   static String get userName {
     final email = currentUser?.email;
@@ -89,17 +131,150 @@ class SupabaseService {
   }
 
   // Database Operations - Transactions
-  static Future<List<Map<String, dynamic>>> getTransactions() async {
+  static Future<List<Map<String, dynamic>>> getTransactions({int limit = 50, int offset = 0}) async {
     try {
       final user = currentUser;
       final query = client.from('transactions').select();
       final response = user != null
-          ? await query.eq('user_id', user.id).order('created_at', ascending: false)
-          : await query.order('created_at', ascending: false);
+          ? await query.eq('user_id', user.id).order('created_at', ascending: false).range(offset, offset + limit - 1)
+          : await query.order('created_at', ascending: false).range(offset, offset + limit - 1);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Supabase fetch transactions error: $e');
       return [];
+    }
+  }
+
+  // Database Operations - Wallets
+  static Future<List<WalletModel>> getWallets() async {
+    try {
+      final user = currentUser;
+      if (user == null) return [];
+      final response = await client.from('wallets').select().eq('user_id', user.id).order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(response).map((e) => WalletModel.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('Supabase fetch wallets error: $e');
+      return [];
+    }
+  }
+
+  static Future<WalletModel?> createWallet(WalletModel wallet) async {
+    try {
+      final user = currentUser;
+      if (user == null) return null;
+      final response = await client.from('wallets').insert({
+        'user_id': user.id,
+        'name': wallet.name,
+        'opening_balance': wallet.openingBalance,
+        'balance_set_at': wallet.balanceSetAt?.toIso8601String(),
+        'icon_code': 0xe041, // default icon
+        'is_dark': wallet.isDark,
+      }).select().single();
+      return WalletModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Supabase create wallet error: $e');
+      return null;
+    }
+  }
+
+  static Future<void> updateWallet(WalletModel wallet) async {
+    try {
+      await client.from('wallets').update({
+        'name': wallet.name,
+        'opening_balance': wallet.openingBalance,
+        'balance_set_at': wallet.balanceSetAt?.toIso8601String(),
+      }).eq('id', wallet.id);
+    } catch (e) {
+      debugPrint('Supabase update wallet error: $e');
+    }
+  }
+
+  static Future<void> deleteWallet(String id) async {
+    try {
+      await client.from('wallets').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Supabase delete wallet error: $e');
+    }
+  }
+
+  // Database Operations - Budgets
+  static Future<List<BudgetModel>> getBudgets() async {
+    try {
+      final user = currentUser;
+      if (user == null) return [];
+      final response = await client.from('budgets').select().eq('user_id', user.id);
+      return List<Map<String, dynamic>>.from(response).map((e) => BudgetModel.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('Supabase fetch budgets error: $e');
+      return [];
+    }
+  }
+
+  static Future<void> upsertBudget(BudgetModel budget) async {
+    try {
+      final user = currentUser;
+      if (user == null) return;
+      
+      await client.from('budgets').upsert({
+        'user_id': user.id,
+        'category': budget.category,
+        'limit_amount': budget.limitAmount,
+      }, onConflict: 'user_id, category');
+    } catch (e) {
+      debugPrint('Supabase upsert budget error: $e');
+    }
+  }
+
+  static Future<void> setupInitialWallets(double cash, double main, double savings) async {
+    try {
+      final user = currentUser;
+      if (user == null) return;
+      
+      final timestamp = DateTime.now().toIso8601String();
+      
+      final walletsToInsert = [
+        {
+          'user_id': user.id,
+          'name': 'Cash',
+          'opening_balance': cash,
+          'balance_set_at': timestamp,
+          'icon_code': Icons.payments.codePoint,
+          'is_dark': false,
+        },
+        {
+          'user_id': user.id,
+          'name': 'Main',
+          'opening_balance': main,
+          'balance_set_at': timestamp,
+          'icon_code': Icons.account_balance.codePoint,
+          'is_dark': true,
+        },
+        {
+          'user_id': user.id,
+          'name': 'Savings',
+          'opening_balance': savings,
+          'balance_set_at': timestamp,
+          'icon_code': Icons.savings.codePoint,
+          'is_dark': false,
+        }
+      ];
+
+      await client.from('wallets').insert(walletsToInsert);
+    } catch (e) {
+      debugPrint('Supabase setup initial wallets error: $e');
+    }
+  }
+
+  // Database Operations - RPC
+  static Future<double> getNetBalance() async {
+    try {
+      final user = currentUser;
+      if (user == null) return 0.0;
+      final response = await client.rpc('get_user_net_balance', params: {'p_user_id': user.id});
+      return (response is num) ? response.toDouble() : double.tryParse(response.toString()) ?? 0.0;
+    } catch (e) {
+      debugPrint('Supabase RPC net balance error: $e');
+      return 0.0;
     }
   }
 

@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/providers/finance_provider.dart';
 import 'core/widgets/app_shell.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/onboarding_screen.dart';
 
 import 'core/services/supabase_service.dart';
 import 'core/services/preferences_service.dart';
@@ -18,7 +19,14 @@ void main() async {
     debugPrint('Supabase initialization note: $e');
   }
 
-  // Hide the Android system navigation bar (fullscreen immersive mode)
+  // Make both status bar and navigation bar transparent for edge-to-edge design
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
+  
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   runApp(
@@ -55,22 +63,56 @@ class _FinanceFlowAppState extends State<FinanceFlowApp> {
       debugShowCheckedModeBanner: false,
       theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
       home: _isLoggedIn
-          ? AppShell(
+          ? AuthWrapper(
               onLogout: () async {
                 await SupabaseService.signOut();
-                setState(() {
-                  _isLoggedIn = false;
-                });
+                setState(() => _isLoggedIn = false);
               },
             )
           : LoginScreen(
-              onLoginSuccess: () {
-                setState(() {
-                  _isLoggedIn = true;
-                });
-              },
+              onLoginSuccess: () => setState(() => _isLoggedIn = true),
             ),
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  final VoidCallback onLogout;
+  const AuthWrapper({super.key, required this.onLogout});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _isLoading = true;
+  bool _needsOnboarding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWallets();
+  }
+
+  Future<void> _checkWallets() async {
+    final wallets = await SupabaseService.getWallets();
+    if (mounted) {
+      setState(() {
+        _needsOnboarding = wallets.isEmpty;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_needsOnboarding) {
+      return const OnboardingScreen();
+    }
+    return AppShell(onLogout: widget.onLogout);
   }
 }
 

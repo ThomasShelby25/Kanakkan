@@ -4,8 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/models/transaction.dart';
-import '../../../core/services/supabase_service.dart';
-
+import '../../../core/models/wallet.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -17,8 +16,14 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   TransactionType _selectedType = TransactionType.expense;
   String _amount = "0.00";
-  String _selectedPayment = "MAIN";
+  
+  // Normal Expense/Income
+  String? _selectedPayment;
   String _selectedCategory = "Transport";
+
+  // Transfer specific
+  String? _fromWallet;
+  String? _toWallet;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Food', 'icon': Icons.restaurant, 'label': 'FOOD'},
@@ -26,6 +31,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     {'name': 'Transport', 'icon': Icons.directions_car, 'label': 'TRANS'},
     {'name': 'Entertainment', 'icon': Icons.theater_comedy, 'label': 'ENT.'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize default wallets after frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final wallets = Provider.of<FinanceProvider>(context, listen: false).wallets;
+      if (wallets.isNotEmpty) {
+        setState(() {
+          _selectedPayment = wallets.first.name;
+          _fromWallet = wallets.first.name;
+          _toWallet = wallets.length > 1 ? wallets[1].name : wallets.first.name;
+        });
+      }
+    });
+  }
 
   void _appendDigit(String digit) {
     setState(() {
@@ -54,32 +75,67 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final parsedAmount = double.tryParse(_amount) ?? 0.00;
     if (parsedAmount <= 0) return;
 
-    final newTx = TransactionModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: '$_selectedCategory Payment',
-      amount: parsedAmount,
-      date: DateTime.now(),
-      category: _selectedCategory,
-      icon: _categories.firstWhere(
-          (c) => c['name'] == _selectedCategory,
-          orElse: () => _categories[0])['icon'] as IconData,
-      type: _selectedType,
-      walletName: _selectedPayment,
-      status: _selectedType == TransactionType.expense ? 'Paid' : 'Recv',
-    );
-
     final financeProvider = Provider.of<FinanceProvider>(context, listen: false);
-    financeProvider.addTransaction(newTx);
-    await SupabaseService.createTransaction(newTx);
+    final now = DateTime.now();
 
-    if (mounted) {
-      Navigator.pop(context);
+    if (_selectedType == TransactionType.transfer) {
+      if (_fromWallet == null || _toWallet == null || _fromWallet == _toWallet) return;
+      
+      // 1. Expense from FromWallet
+      final txOut = TransactionModel(
+        id: now.millisecondsSinceEpoch.toString(),
+        title: 'Transfer to $_toWallet',
+        amount: parsedAmount,
+        date: now,
+        category: 'Transfer',
+        icon: Icons.swap_horiz,
+        type: TransactionType.expense,
+        walletName: _fromWallet!,
+        status: 'Paid',
+      );
+      
+      // 2. Income to ToWallet
+      final txIn = TransactionModel(
+        id: (now.millisecondsSinceEpoch + 1).toString(),
+        title: 'Transfer from $_fromWallet',
+        amount: parsedAmount,
+        date: now.add(const Duration(seconds: 1)),
+        category: 'Transfer',
+        icon: Icons.swap_horiz,
+        type: TransactionType.income,
+        walletName: _toWallet!,
+        status: 'Recv',
+      );
+
+      financeProvider.addTransaction(txOut);
+      financeProvider.addTransaction(txIn);
+
+    } else {
+      if (_selectedPayment == null) return;
+      // Normal transaction
+      final newTx = TransactionModel(
+        id: now.millisecondsSinceEpoch.toString(),
+        title: '$_selectedCategory Payment',
+        amount: parsedAmount,
+        date: now,
+        category: _selectedCategory,
+        icon: _categories.firstWhere((c) => c['name'] == _selectedCategory, orElse: () => _categories[0])['icon'] as IconData,
+        type: _selectedType,
+        walletName: _selectedPayment!,
+        status: _selectedType == TransactionType.expense ? 'Paid' : 'Recv',
+      );
+
+      financeProvider.addTransaction(newTx);
     }
-  }
 
+    if (mounted) Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final wallets = Provider.of<FinanceProvider>(context).wallets;
+    final isTransfer = _selectedType == TransactionType.transfer;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -87,10 +143,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Add Transaction',
-          style: AppTypography.titleMedium(),
-        ),
+        title: Text('Add Transaction', style: AppTypography.titleMedium()),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -98,277 +151,264 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-              const SizedBox(height: 12),
-              // EXPENSE / INCOME Segmented Toggle
-              Container(
-                width: 240,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 12),
+                
+                // 3-Way Segmented Toggle
+                Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildTabButton('EXPENSE', TransactionType.expense),
+                      _buildTabButton('INCOME', TransactionType.income),
+                      _buildTabButton('TRANSFER', TransactionType.transfer),
+                    ],
+                  ),
                 ),
-                child: Row(
+                const SizedBox(height: 24),
+
+                // Large Amount Display
+                Text('AMOUNT', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedType = TransactionType.expense;
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _selectedType == TransactionType.expense
-                                ? AppColors.primary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'EXPENSE',
-                            style: AppTypography.labelSmall(
-                              color: _selectedType == TransactionType.expense
-                                  ? AppColors.surface
-                                  : AppColors.secondary,
-                            ).copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedType = TransactionType.income;
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _selectedType == TransactionType.income
-                                ? AppColors.primary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'INCOME',
-                            style: AppTypography.labelSmall(
-                              color: _selectedType == TransactionType.income
-                                  ? AppColors.surface
-                                  : AppColors.secondary,
-                            ).copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
+                    Text('₹', style: AppTypography.amountMedium(color: AppColors.primary)),
+                    const SizedBox(width: 4),
+                    Text(_amount, style: AppTypography.amountLarge(fontSize: 40)),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              // Large Amount Display
-              Text(
-                'AMOUNT',
-                style: AppTypography.labelCaps(color: AppColors.secondary),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '₹',
-                    style: AppTypography.amountMedium(color: AppColors.primary),
+                // Dynamic Wallet Selectors
+                if (isTransfer) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('FROM WALLET', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                            const SizedBox(height: 8),
+                            _buildWalletDropdown(
+                              value: _fromWallet,
+                              wallets: wallets,
+                              onChanged: (v) => setState(() => _fromWallet = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(Icons.arrow_forward_rounded, color: AppColors.secondary),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('TO WALLET', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                            const SizedBox(height: 8),
+                            _buildWalletDropdown(
+                              value: _toWallet,
+                              wallets: wallets,
+                              onChanged: (v) => setState(() => _toWallet = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(width: 4),
-                  Text(
-                    _amount,
-                    style: AppTypography.amountLarge(fontSize: 40),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('PAYMENT WALLET', style: AppTypography.labelCaps(color: AppColors.secondary)),
                   ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 60,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: wallets.length,
+                      itemBuilder: (context, index) {
+                        final w = wallets[index];
+                        final isSelected = _selectedPayment == w.name;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedPayment = w.name),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primary : AppColors.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isSelected ? AppColors.primary : AppColors.outline),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(w.icon, color: isSelected ? Colors.white : AppColors.secondary, size: 20),
+                                const SizedBox(height: 4),
+                                Text(w.name, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : AppColors.secondary)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Category Grid (Only for Expense/Income)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('CATEGORY', style: AppTypography.labelCaps(color: AppColors.secondary)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat['name'];
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedCategory = cat['name'] as String),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? AppColors.primary : AppColors.outline,
+                                width: isSelected ? 1.5 : 1.0,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? AppColors.primary : AppColors.surfaceContainerHigh,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(cat['icon'] as IconData, color: isSelected ? Colors.white : AppColors.secondary, size: 18),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  cat['label'] as String,
+                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isSelected ? AppColors.primary : AppColors.secondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
                 ],
-              ),
-              const SizedBox(height: 20),
 
-              // Payment Method Selector
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'PAYMENT METHOD',
-                  style: AppTypography.labelCaps(color: AppColors.secondary),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: ['MAIN', 'SAVINGS', 'CASH'].map((method) {
-                  final isSelected = _selectedPayment == method;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedPayment = method;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: isSelected
-                              ? null
-                              : Border.all(color: AppColors.outline),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              method == 'MAIN'
-                                  ? Icons.account_balance_wallet
-                                  : method == 'SAVINGS'
-                                      ? Icons.credit_card
-                                      : Icons.payments,
-                              color: isSelected ? Colors.white : AppColors.secondary,
-                              size: 20,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              method,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.white : AppColors.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-
-              // Category Grid
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'CATEGORY',
-                  style: AppTypography.labelCaps(color: AppColors.secondary),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: _categories.map((cat) {
-                  final isSelected = _selectedCategory == cat['name'];
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedCategory = cat['name'] as String;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.outline,
-                            width: isSelected ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.surfaceContainerHigh,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                cat['icon'] as IconData,
-                                color: isSelected ? Colors.white : AppColors.secondary,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              cat['label'] as String,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-
-              // Numeric Keypad
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
-                ),
-                child: GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 3,
-                  childAspectRatio: 2.2,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: [
-                    for (var i = 1; i <= 9; i++) _buildKeypadButton(i.toString()),
-                    _buildKeypadButton('.'),
-                    _buildKeypadButton('0'),
-                    _buildKeypadIconButton(Icons.backspace_outlined, _deleteDigit),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 4,
+                // Numeric Keypad
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
                   ),
-                  onPressed: _saveTransaction,
-                  icon: const Icon(Icons.check_circle_outline, size: 22),
-                  label: Text(
-                    'SAVE TRANSACTION',
-                    style: AppTypography.titleMedium(color: Colors.white),
+                  child: GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 3,
+                    childAspectRatio: 2.2,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    children: [
+                      for (var i = 1; i <= 9; i++) _buildKeypadButton(i.toString()),
+                      _buildKeypadButton('.'),
+                      _buildKeypadButton('0'),
+                      _buildKeypadIconButton(Icons.backspace_outlined, _deleteDigit),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 12),
+
+                // Save Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 4,
+                    ),
+                    onPressed: _saveTransaction,
+                    icon: Icon(isTransfer ? Icons.swap_horiz : Icons.check_circle_outline, size: 22),
+                    label: Text(
+                      isTransfer ? 'CONFIRM TRANSFER' : 'SAVE TRANSACTION',
+                      style: AppTypography.titleMedium(color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  Widget _buildTabButton(String title, TransactionType type) {
+    final isSelected = _selectedType == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedType = type),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            style: AppTypography.labelSmall(
+              color: isSelected ? AppColors.surface : AppColors.secondary,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletDropdown({required String? value, required List<WalletModel> wallets, required Function(String?) onChanged}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: value,
+          dropdownColor: AppColors.surface,
+          items: wallets.map((w) {
+            return DropdownMenuItem<String>(
+              value: w.name,
+              child: Text(w.name, style: AppTypography.bodyMedium()),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
 
   Widget _buildKeypadButton(String label) {
     return GestureDetector(
@@ -380,10 +420,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           border: Border.all(color: AppColors.outline),
         ),
         alignment: Alignment.center,
-        child: Text(
-          label,
-          style: AppTypography.amountMedium(fontSize: 18),
-        ),
+        child: Text(label, style: AppTypography.amountMedium(fontSize: 18)),
       ),
     );
   }

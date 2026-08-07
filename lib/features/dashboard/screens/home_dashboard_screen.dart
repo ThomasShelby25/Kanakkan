@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/models/transaction.dart';
+import '../../budgets/screens/wallet_manager_screen.dart';
 
 
 
@@ -227,7 +228,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     style: AppTypography.titleMedium(),
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const WalletManagerScreen(),
+                        ),
+                      );
+                    },
                     child: Text(
                       'View All',
                       style: AppTypography.labelSmall(color: AppColors.primary)

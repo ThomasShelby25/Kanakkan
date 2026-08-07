@@ -3,6 +3,7 @@ import 'package:telephony/telephony.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
 import '../models/transaction.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 
 // Top-level function for background SMS processing
@@ -38,6 +39,17 @@ class SmsService {
         onBackgroundMessage: backgroundMessageHandler,
       );
     }
+    await _requestBatteryOptimizationExemption();
+  }
+
+  static Future<void> _requestBatteryOptimizationExemption() async {
+    try {
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (e) {
+      debugPrint('Battery optimization exemption error: $e');
+    }
   }
 
   static void _handleMessage(SmsMessage message) {
@@ -57,7 +69,7 @@ class SmsService {
           date: DateTime.now(),
           category: parsed['category'] ?? 'Auto SMS',
           icon: isExpense ? Icons.shopping_bag : Icons.work,
-          walletName: parsed['account'] ?? 'Main',
+          walletName: await _mapAccountToWallet(parsed['account']),
         ),
       );
     }
@@ -146,13 +158,43 @@ class SmsService {
   /// Guess a category based on payee/merchant name
   static String _guessCategory(String payee) {
     final p = payee.toLowerCase();
-    if (p.contains('swiggy') || p.contains('zomato') || p.contains('food')) return 'Food';
-    if (p.contains('uber') || p.contains('ola') || p.contains('rapido')) return 'Transport';
-    if (p.contains('amazon') || p.contains('flipkart') || p.contains('myntra')) return 'Shopping';
-    if (p.contains('netflix') || p.contains('spotify') || p.contains('hotstar')) return 'Entertainment';
-    if (p.contains('electricity') || p.contains('water') || p.contains('gas')) return 'Bills';
-    if (p.contains('hospital') || p.contains('pharmacy') || p.contains('doctor')) return 'Health';
+    
+    // Food & Dining
+    if (RegExp(r'\b(swiggy|zomato|kfc|mcdonalds|dominos|starbucks|cafe|restaurant|food)\b').hasMatch(p)) return 'Food';
+    
+    // Transport & Auto
+    if (RegExp(r'\b(uber|ola|rapido|namma yatri|irctc|makemytrip|redbus|petrol|fuel|hpcl|bpcl|indian oil)\b').hasMatch(p)) return 'Transport';
+    
+    // Shopping & Groceries
+    if (RegExp(r'\b(amazon|flipkart|myntra|blinkit|zepto|instamart|bigbasket|dmart|reliance|ajio|shopping)\b').hasMatch(p)) return 'Shopping';
+    
+    // Entertainment
+    if (RegExp(r'\b(netflix|spotify|hotstar|prime video|bookmyshow|pvrcinemas|entertainment)\b').hasMatch(p)) return 'Entertainment';
+    
+    // Utilities & Bills
+    if (RegExp(r'\b(electricity|water|gas|jio|airtel|vi|recharge|bescom|bill|broadband)\b').hasMatch(p)) return 'Bills';
+    
+    // Health & Medical
+    if (RegExp(r'\b(apollo|pharmacy|hospital|clinic|doctor|medplus|netmeds|health)\b').hasMatch(p)) return 'Health';
+
+    // UPI transfers / generic people (fallback)
+    if (p.isNotEmpty && !p.contains('upi') && !p.contains('vpa')) return 'General';
+    
     return 'Auto SMS';
+  }
+
+  static Future<String> _mapAccountToWallet(String? account) async {
+    if (account == null || account == 'Unknown') return 'Main';
+    try {
+      final wallets = await SupabaseService.getWallets();
+      final cleanAccount = account.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleanAccount.isEmpty) return 'Main';
+      
+      for (var w in wallets) {
+        if (w.name.contains(cleanAccount)) return w.name;
+      }
+    } catch (_) {}
+    return 'Main';
   }
 
   
@@ -175,7 +217,7 @@ class SmsService {
               date: DateTime.parse(data['date']),
               category: 'Auto SMS',
               icon: data['type'] == 'expense' ? Icons.shopping_bag : Icons.work,
-              walletName: 'Main',
+              walletName: await _mapAccountToWallet(data['account']),
             ),
           );
         }
@@ -239,7 +281,7 @@ class SmsService {
             date: date,
             category: parsed['category'] ?? 'Auto SMS',
             icon: isExpense ? Icons.shopping_bag : Icons.work,
-            walletName: parsed['account'] ?? 'Main',
+            walletName: await _mapAccountToWallet(parsed['account']),
           ),
         );
         newCount++;

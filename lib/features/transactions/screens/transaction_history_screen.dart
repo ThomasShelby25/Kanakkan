@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/models/transaction.dart';
+import '../../../core/services/supabase_service.dart';
+import '../../../core/services/report_service.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -16,12 +18,39 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _selectedFilter = "ALL";
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 && !_isLoadingMore) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    setState(() => _isLoadingMore = true);
+    await context.read<FinanceProvider>().loadRealTransactions(loadMore: true);
+    if (mounted) setState(() => _isLoadingMore = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final financeProvider = Provider.of<FinanceProvider>(context);
 
-    final filteredTransactions = financeProvider.transactions.where((tx) {
+    final filteredTransactions = financeProvider.validTransactions.where((tx) {
       if (_selectedFilter == "EXPENSE" && tx.type != TransactionType.expense) return false;
       if (_selectedFilter == "INCOME" && tx.type != TransactionType.income) return false;
       if (_searchController.text.isNotEmpty) {
@@ -39,9 +68,38 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Transaction History',
-                style: AppTypography.headlineMedium(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Transaction History',
+                    style: AppTypography.headlineMedium(),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.picture_as_pdf_rounded, color: AppColors.primary),
+                      tooltip: 'Export as PDF',
+                      onPressed: () async {
+                        final provider = Provider.of<FinanceProvider>(context, listen: false);
+                        
+                        final filteredIncome = filteredTransactions.where((tx) => tx.type == TransactionType.income).fold(0.0, (sum, tx) => sum + tx.amount);
+                        final filteredExpense = filteredTransactions.where((tx) => tx.type == TransactionType.expense).fold(0.0, (sum, tx) => sum + tx.amount);
+                        
+                        await ReportService.generateAndPrintTransactionReport(
+                          userName: SupabaseService.currentUser?.email?.split('@')[0] ?? 'User',
+                          netBalance: provider.netBalance,
+                          totalIncome: filteredIncome,
+                          totalExpense: filteredExpense,
+                          transactions: filteredTransactions,
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -115,10 +173,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           side: BorderSide(color: AppColors.outline),
                         ),
                         child: ListView.separated(
-                          itemCount: filteredTransactions.length,
+                          controller: _scrollController,
+                          itemCount: filteredTransactions.length + (_isLoadingMore ? 1 : 0),
                           separatorBuilder: (context, index) =>
                               Divider(height: 1, color: AppColors.outline),
                           itemBuilder: (context, index) {
+                            if (index == filteredTransactions.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
                             final tx = filteredTransactions[index];
                             final isExpense = tx.type == TransactionType.expense;
                             return ListTile(

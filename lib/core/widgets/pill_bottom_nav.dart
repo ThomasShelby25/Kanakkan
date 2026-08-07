@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
 
 class PillBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -42,6 +43,11 @@ class PillBottomNav extends StatelessWidget {
                 icon: Icons.home_rounded,
                 isActive: currentIndex == 0,
               ),
+              _buildNavItem(
+                index: 1,
+                icon: Icons.pie_chart_rounded,
+                isActive: currentIndex == 1,
+              ),
               // Add Button centered
               GestureDetector(
                 onTap: onAddTap,
@@ -59,14 +65,15 @@ class PillBottomNav extends StatelessWidget {
                 ),
               ),
               _buildNavItem(
-                index: 1,
+                index: 2,
                 icon: Icons.history_rounded,
-                isActive: currentIndex == 1,
+                isActive: currentIndex == 2,
               ),
               _buildNavItem(
-                index: 2,
+                index: 3,
                 icon: Icons.person_rounded,
-                isActive: currentIndex == 2,
+                isActive: currentIndex == 3,
+                customIcon: _buildAvatarIcon(currentIndex == 3),
               ),
             ],
           ),
@@ -75,22 +82,40 @@ class PillBottomNav extends StatelessWidget {
     );
   }
 
+  Widget? _buildAvatarIcon(bool isActive) {
+    final avatarUrl = SupabaseService.currentUser?.userMetadata?['avatar_url'];
+    if (avatarUrl == null) return null;
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: isActive ? Border.all(color: Colors.white, width: 1.5) : null,
+        image: DecorationImage(
+          image: NetworkImage(avatarUrl),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNavItem({
     required int index,
     required IconData icon,
     required bool isActive,
+    Widget? customIcon,
   }) {
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(customIcon != null ? 6 : 8),
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFFB8000B) : Colors.transparent,
           shape: BoxShape.circle,
         ),
-        child: Icon(
+        child: customIcon ?? Icon(
           icon,
           color: isActive ? Colors.white : Colors.white54,
           size: 22,

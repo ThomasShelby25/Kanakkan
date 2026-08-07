@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/supabase_service.dart';
@@ -22,31 +22,6 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _acceptTerms = false;
   bool _isLoading = false;
 
-  Future<void> _requestSmsPermission() async {
-    final status = await Permission.sms.request();
-    if (mounted) {
-      if (status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'SMS Permission Granted: Expense detection enabled for fixed wallet in ₹ (Rupees).',
-            ),
-            backgroundColor: AppColors.primary,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'SMS permission requested to monitor spent money from fixed wallet.',
-            ),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
   Future<void> _handleSignup() async {
     final email = _emailController.text.trim();
@@ -68,8 +43,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       await SupabaseService.signUp(email, password);
-      await _requestSmsPermission();
       if (mounted) {
+        Navigator.pop(context);
         widget.onSignupSuccess();
       }
     } catch (e) {
@@ -79,8 +54,8 @@ class _SignupScreenState extends State<SignupScreen> {
         // Try logging in if user already exists
         try {
           await SupabaseService.signIn(email, password);
-          await _requestSmsPermission();
           if (mounted) {
+            Navigator.pop(context);
             widget.onSignupSuccess();
           }
           return;
@@ -96,7 +71,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         );
         // Direct entry if account state allows
-        await _requestSmsPermission();
+        Navigator.pop(context);
         widget.onSignupSuccess();
       }
     } finally {
